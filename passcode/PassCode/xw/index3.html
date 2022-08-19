@@ -1,0 +1,189 @@
+
+
+
+
+
+  
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>浙江工业大学通行码</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel="stylesheet" href="/PassCode/resources/jkm/css/main.css?v=1.0" />
+</head>
+
+<script src="/PassCode/resources/jkm/js/jquery-1.7.2.min.js"></script>
+<script type="text/javascript" src="/PassCode/resources/jkm/js/jquery.qrcode.min.js"></script>
+<script>
+    jQuery(function(){
+        var cardNo = '';
+        var colour = '8456e1';
+        var flag = 'Invalid';
+        if(null == colour || "" == colour){
+            colour = "#CCCCCC";
+        }
+
+
+        var mzt='';
+        var dateTime='';
+        var array=getJkm(cardNo);
+        if(array.length>0){
+            mzt = array[0].mzt;
+            if (mzt=='red'){
+                colour = "DC143C";
+            }
+            dateTime = array[0].dateTime;
+        }
+        // if(mzt!='green'){
+        //     colour = "CCCCCC";
+        // }
+        // if(mzt=='green'){
+        //     $("#hzjkm").append('<div  class="hz" style="color: #55b957">健康码为 绿码</div>');
+        // }
+        // if(mzt=='yellow'){
+        //     $("#hzjkm").append('<div  class="hz" style="color: #ee8232">健康码为 黄码</div>');
+        // }
+        // if(mzt=='red'){
+        //     $("#hzjkm").append('<div class="hz" style="color: #e8453b">健康码为 红码</div>');
+        // }
+        //
+        // if(mzt=='orange'){
+        //     $("#hzjkm").append('<div class="hz" style="color: #FFA500">健康码为 橙码</div>');
+        // }
+        // if(mzt==''){
+        //     colour = "1E90FF";
+        //     $("#hzjkm").append('<div class="hz" style="color: #006bc7">绿码获取失败（请打开支付宝出示）</div>');
+        // }
+        // if(mzt=='' && flag== 'Invalid'){
+        //     colour = "CCCCCC";
+        // }
+        // if(dateTime!=''){
+        //     $("#dateTime").append('<div class="time">同步时间：'+dateTime+'</div>');
+        // }
+
+        jQuery('#output').qrcode({
+            // render	: "table",
+            width: 180,
+            height: 180,
+            //text	: "http://baidu.com",
+            
+            text: utf16to8('{"IDCard":"330281199910163316","signature":"2273fb4d65960ad16fe388056525f572a1c5c2a2","name":"蒋晨辉","id":"a","type":"3","nonce":"62","timestamp":1660878654533}'),
+            //text	: "/PassCode/information?account=18053590814&token=21a04f3b-1e7b-40b2-8cfc-8d1f0230cd02",
+            render: "canvas", //也可以替换为table
+            //foreground: "#1E90FF",
+            foreground: "#"+colour,
+            background: "#FFF"
+
+        });
+    })
+
+    function utf16to8(str) {
+        console.log(str);
+        var out, i, len, c;
+        out = "";
+        len = str.length;
+        for(i = 0; i < len; i++) {
+            c = str.charCodeAt(i);
+            if ((c >= 0x0001) && (c <= 0x007F)) {
+                out += str.charAt(i);
+            } else if (c > 0x07FF) {
+                out += String.fromCharCode(0xE0 | ((c >> 12) & 0x0F));
+                out += String.fromCharCode(0x80 | ((c >>  6) & 0x3F));
+                out += String.fromCharCode(0x80 | ((c >>  0) & 0x3F));
+            } else {
+                out += String.fromCharCode(0xC0 | ((c >>  6) & 0x1F));
+                out += String.fromCharCode(0x80 | ((c >>  0) & 0x3F));
+            }
+        }
+        console.log(out);
+        return out;
+    }
+
+
+    function getJkm(cardNo) {
+        var datas = '';
+        $.ajax({
+            type : "GET",
+            url : "/PassCode/jkm3?account=18053590814&cardNo=&identity=校外人员",
+            async : false,
+            dataType:'json',
+            success : function(data) {
+                datas=data;
+            }
+        });
+        return datas;
+    }
+    //获取系统时间
+    function showTime() {
+        nowtime = new Date();
+        year = nowtime.getFullYear();//年
+        month = nowtime.getMonth() + 1;//月
+        day = nowtime.getDate();//日
+        hour = nowtime.getHours();//时
+        minutes = nowtime.getMinutes(); //分
+        seconds = nowtime.getSeconds(); //秒
+        //文字增加空格
+        // document.getElementById("div_timer").style = "white-space:pre;";
+        //显示时间
+        document.getElementById("div_timer").innerText = p(year)+"-"+p(month) +"-"+p(day) +" "+ p(hour) + ":" + p(minutes) + ":" + p(seconds);
+    }
+    setInterval("showTime()", 1000);
+    //月日时分秒小于10补0
+    function p(s) {
+        return s < 10 ? '0' + s : s;
+    }
+
+</script>
+
+<body class="sjtu-xw-bg">
+
+<div class="banner-sjtu"></div>
+<div class="content-box">
+
+    <div class="top-title">
+        <h3>蒋晨辉通行码</h3>
+        
+        
+            
+        
+    </div>
+
+    <br/>
+    <br/>
+    <br/>
+    
+        <div class="time">单位：信息工程学院</div>
+        
+    
+
+    
+        <strong><div class="time2" id="div_timer"></div></strong>
+    
+    <div class="qr">
+        
+            <div id="output"></div>
+        
+    </div>
+
+    
+        <div class="time">有效时间至：2022-08-19 23:59:59</div>
+    
+    <div id="hzjkm"></div>
+
+
+    <div id="dateTime"></div>
+    <p class="tip" style="margin-top: 10px;">凭此码、杭州健康绿码、有效证件并测温进校。<br>适用范围：朝晖校区、屏峰校区、莫干山校区，<br>请主动出示，配合检查。
+    </p>
+</div>
+<!--
+<div class="bottom-tip">
+    <h3>安 保 处 ：0571-88206110</h3>
+'    <h3>技术支持：0571-87951669</h3>
+</div>
+-->
+</body>
+</html>
