@@ -145,7 +145,7 @@
 <div class="content-box">
 
     <div class="top-title">
-        <h3>蒋晨辉通行码</h3>
+        <h3>通行码</h3>
         
         
             
@@ -185,5 +185,52 @@
 '    <h3>技术支持：0571-87951669</h3>
 </div>
 -->
+
+<script type="text/javascript" src="/PassCode/resources/jkm/js/moment.js"></script>
+<script type="text/javascript">
+var dt = new moment().format('YYYY-MM-DD') ;
+console.log(dt);
+var start = dt + ' 00:00:00';
+var end ='有效时间至：'+ dt + ' 23:59:59';
+// var start_block = document.querySelector("#label_0d04bf49-62f0-4388-87b2-dc50f2d6c21c");
+var end_block = document.querySelector("body > div.content-box > div:nth-child(8)");
+
+// start_block.textContent = start;
+// end_block.textContent = end;
+window.onload=function(){
+	// start_block.textContent = start;
+  end_block.textContent = end;
+  document.querySelector('body > div.content-box > div.top-title > h3').textContent = getQueryString('name')+'通行码';
+
+}   
+
+// //获取系统时间
+// function showTime() {
+// 	nowtime = new Date();
+// 	year = nowtime.getFullYear();//年
+// 	month = nowtime.getMonth() + 1;//月
+// 	day = nowtime.getDate();//日
+// 	hour = nowtime.getHours();//时
+// 	minutes = nowtime.getMinutes(); //分
+// 	seconds = nowtime.getSeconds(); //秒
+// 	//文字增加空格
+// 	// document.getElementById("div_timer").style = "white-space:pre;";
+// 	//显示时间
+// 	document.getElementById("div_timer").innerText = p(year)+"-"+p(month) +"-"+p(day) +" "+ p(hour) + ":" + p(minutes) + ":" + p(seconds);
+// }
+// setInterval("showTime()", 1000);
+// //月日时分秒小于10补0
+// function p(s) {
+// 	return s < 10 ? '0' + s : s;
+// }
+
+function getQueryString(name) { 
+	  var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i"); 
+	  var r = window.location.search.substr(1).match(reg); 
+	  if (r != null) return decodeURI(r[2]); return null; 
+}
+
+</script>
+
 </body>
 </html>
