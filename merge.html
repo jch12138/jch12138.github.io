@@ -3,83 +3,103 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>文件合并工具</title>
+  <title>多文件嵌入 PNG 图片</title>
   <style>
     body {
       font-family: sans-serif;
-      padding: 1.5em;
-      background-color: #f9f9f9;
-      color: #333;
+      padding: 1em;
       text-align: center;
     }
-
-    h2 {
-      font-size: 1.4em;
-      margin-bottom: 1em;
-    }
-
-    input[type="file"] {
+    input {
       margin: 1em 0;
-      font-size: 1em;
     }
-
     button {
-      background-color: #007aff;
-      color: white;
+      padding: 0.7em 1.5em;
       font-size: 1em;
-      padding: 0.8em 1.5em;
+      background: #007aff;
+      color: white;
       border: none;
       border-radius: 6px;
-      cursor: pointer;
     }
-
-    button:active {
-      background-color: #005bbb;
-    }
-
-    .note {
-      margin-top: 1.5em;
-      font-size: 0.9em;
-      color: #777;
+    canvas {
+      display: none;
     }
   </style>
 </head>
 <body>
-  <h2>合并固定图片 + 任意文件</h2>
-
-  <input type="file" id="extraFile"><br>
-
-  <button onclick="mergeFiles()">合并并下载 dog.jpg</button>
-
-  <div class="note">
-    上传任意文件，将其附加在固定图片后导出为 dog.jpg。
-  </div>
+  <h2>多文件 → 合成 PNG 图片</h2>
+  <input type="file" id="fileInput" multiple><br>
+  <button onclick="encodeFiles()">生成图片</button>
+  <canvas id="canvas"></canvas>
 
   <script>
-    async function mergeFiles() {
-      const extraInput = document.getElementById('extraFile');
-      if (!extraInput.files[0]) {
-        alert('请先选择一个文件');
+    function encodeUTF8(str) {
+      return new TextEncoder().encode(str);
+    }
+
+    async function encodeFiles() {
+      const input = document.getElementById('fileInput');
+      const files = input.files;
+      if (!files.length) {
+        alert('请选择文件');
         return;
       }
 
-      // 加载固定 PNG 图片（示例：Wikipedia 狮子图）
-      const pngUrl = 'https://jch12138.github.io/dog.png';
-      const pngResponse = await fetch(pngUrl);
-      const pngArray = await pngResponse.arrayBuffer();
+      let dataParts = [];
 
-      const extraBlob = extraInput.files[0];
-      const extraArray = await extraBlob.arrayBuffer();
+      for (const file of files) {
+        const nameBytes = encodeUTF8(file.name);
+        const content = new Uint8Array(await file.arrayBuffer());
 
-      const mergedBlob = new Blob([pngArray, extraArray], { type: 'image/jpeg' });
+        // 文件结构：[nameLen][name][contentLen][content]
+        const nameLen = new Uint8Array(4);
+        new DataView(nameLen.buffer).setUint32(0, nameBytes.length);
 
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(mergedBlob);
-      a.download = 'dog.jpg';
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      URL.revokeObjectURL(a.href);
+        const contentLen = new Uint8Array(4);
+        new DataView(contentLen.buffer).setUint32(0, content.length);
+
+        dataParts.push(nameLen, nameBytes, contentLen, content);
+      }
+
+      // 合并所有数据块
+      let totalLength = dataParts.reduce((sum, part) => sum + part.length, 0);
+      const fullData = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const part of dataParts) {
+        fullData.set(part, offset);
+        offset += part.length;
+      }
+
+      // 每3字节为1像素的RGB，补齐到4字节(RGBA)
+      const pixelCount = Math.ceil(fullData.length / 3);
+      const width = Math.ceil(Math.sqrt(pixelCount));
+      const height = Math.ceil(pixelCount / width);
+
+      const canvas = document.getElementById('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      const imageData = ctx.createImageData(width, height);
+      const imgData = imageData.data;
+
+      for (let i = 0; i < fullData.length; i++) {
+        imgData[i] = fullData[i];
+      }
+
+      // 填充 Alpha = 255
+      for (let i = 0; i < width * height; i++) {
+        imgData[i * 4 + 3] = 255;
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+
+      canvas.toBlob(blob => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'embedded.png';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }, 'image/png');
     }
   </script>
 </body>
