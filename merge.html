@@ -1,105 +1,68 @@
+
 <!DOCTYPE html>
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>多文件嵌入 PNG 图片</title>
+  <title>解码图像中的文件</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body {
-      font-family: sans-serif;
-      padding: 1em;
-      text-align: center;
-    }
-    input {
-      margin: 1em 0;
-    }
-    button {
-      padding: 0.7em 1.5em;
-      font-size: 1em;
-      background: #007aff;
-      color: white;
-      border: none;
-      border-radius: 6px;
-    }
-    canvas {
-      display: none;
-    }
+    body { font-family: sans-serif; text-align: center; padding: 2em; background: #f5f5f5; }
+    input, button { margin: 1em 0; font-size: 1em; }
+    button { padding: 0.5em 2em; background: #28a745; color: white; border: none; border-radius: 8px; }
+    #file-list a { display: block; margin: 0.5em 0; }
   </style>
 </head>
 <body>
-  <h2>多文件 → 合成 PNG 图片</h2>
-  <input type="file" id="fileInput" multiple><br>
-  <button onclick="encodeFiles()">生成图片</button>
-  <canvas id="canvas"></canvas>
-
+  <h2>📁 解码嵌入图片</h2>
+  <input type="file" id="imgInput" accept="image/*"><br>
+  <button onclick="decode()">开始解码</button>
+  <div id="file-list"></div>
   <script>
-    function encodeUTF8(str) {
-      return new TextEncoder().encode(str);
-    }
+    function decode() {
+      const file = document.getElementById('imgInput').files[0];
+      if (!file) return alert("请上传图片");
 
-    async function encodeFiles() {
-      const input = document.getElementById('fileInput');
-      const files = input.files;
-      if (!files.length) {
-        alert('请选择文件');
-        return;
-      }
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = e => img.src = e.target.result;
+      reader.readAsDataURL(file);
 
-      let dataParts = [];
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const pixels = ctx.getImageData(0, 0, img.width, img.height).data;
 
-      for (const file of files) {
-        const nameBytes = encodeUTF8(file.name);
-        const content = new Uint8Array(await file.arrayBuffer());
+        const bytes = [];
+        for (let i = 0; i < pixels.length; i += 4) {
+          bytes.push(pixels[i]);
+        }
 
-        // 文件结构：[nameLen][name][contentLen][content]
-        const nameLen = new Uint8Array(4);
-        new DataView(nameLen.buffer).setUint32(0, nameBytes.length);
+        const buffer = new Uint8Array(bytes).buffer;
+        const view = new DataView(buffer);
+        const decoder = new TextDecoder();
 
-        const contentLen = new Uint8Array(4);
-        new DataView(contentLen.buffer).setUint32(0, content.length);
+        let pos = 0;
+        const fileCount = view.getUint16(pos); pos += 2;
+        const container = document.getElementById('file-list');
+        container.innerHTML = `<p>🔍 共侦测到 <b>${fileCount}</b> 个档案</p>`;
 
-        dataParts.push(nameLen, nameBytes, contentLen, content);
-      }
+        for (let i = 0; i < fileCount; i++) {
+          const nameLen = view.getUint16(pos); pos += 2;
+          const name = decoder.decode(new Uint8Array(buffer, pos, nameLen)); pos += nameLen;
+          const fileLen = view.getUint32(pos); pos += 4;
+          const content = new Uint8Array(buffer.slice(pos, pos + fileLen)); pos += fileLen;
 
-      // 合并所有数据块
-      let totalLength = dataParts.reduce((sum, part) => sum + part.length, 0);
-      const fullData = new Uint8Array(totalLength);
-      let offset = 0;
-      for (const part of dataParts) {
-        fullData.set(part, offset);
-        offset += part.length;
-      }
-
-      // 每3字节为1像素的RGB，补齐到4字节(RGBA)
-      const pixelCount = Math.ceil(fullData.length / 3);
-      const width = Math.ceil(Math.sqrt(pixelCount));
-      const height = Math.ceil(pixelCount / width);
-
-      const canvas = document.getElementById('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      const imageData = ctx.createImageData(width, height);
-      const imgData = imageData.data;
-
-      for (let i = 0; i < fullData.length; i++) {
-        imgData[i] = fullData[i];
-      }
-
-      // 填充 Alpha = 255
-      for (let i = 0; i < width * height; i++) {
-        imgData[i * 4 + 3] = 255;
-      }
-
-      ctx.putImageData(imageData, 0, 0);
-
-      canvas.toBlob(blob => {
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'embedded.png';
-        a.click();
-        URL.revokeObjectURL(a.href);
-      }, 'image/png');
+          const blob = new Blob([content]);
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = name;
+          a.textContent = `📎 ${name} (${fileLen} B)`;
+          container.appendChild(a);
+        }
+      };
     }
   </script>
 </body>
