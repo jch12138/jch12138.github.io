@@ -1,91 +1,87 @@
-
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <title>打包文件为图像</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <title>JPG + ZIP 合成工具</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- JSZip CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
   <style>
-    body { font-family: sans-serif; text-align: center; padding: 2em; background: #f5f5f5; }
-    input, button { margin: 1em 0; font-size: 1em; }
-    button { padding: 0.5em 2em; background: #007bff; color: white; border: none; border-radius: 8px; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont;
+      padding: 20px;
+    }
+    button {
+      margin-top: 12px;
+      padding: 10px 16px;
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
-  <h2>📦 多文件 → 合成图片</h2>
-  <input type="file" id="files" multiple><br>
-  <button onclick="encode()">生成图片</button>
-  <div id="preview"></div>
+
+  <h2>JPG + ZIP 文件合成</h2>
+
+  <input type="file" id="fileInput" multiple />
+  <br />
+
+  <button id="mergeBtn">合成并下载 JPG</button>
+
   <script>
-    function encode() {
-      const files = document.getElementById('files').files;
-      if (!files.length) return alert("请上传文件");
+    // 预留的 JPG 图片地址
+    const BASE_JPG_URL = "https://example.com/base.jpg";
 
-      let parts = [];
-      const encoder = new TextEncoder();
-      const fileCount = files.length;
-      parts.push(new Uint8Array([fileCount >> 8, fileCount & 0xff]));
+    const fileInput = document.getElementById("fileInput");
+    const mergeBtn = document.getElementById("mergeBtn");
 
-      const readFiles = Array.from(files).map(file => {
-        return new Promise(resolve => {
-          const reader = new FileReader();
-          reader.onload = e => {
-            const nameBytes = encoder.encode(file.name);
-            const content = new Uint8Array(e.target.result);
-            const header = new Uint8Array(2 + nameBytes.length + 4);
-            header[0] = nameBytes.length >> 8;
-            header[1] = nameBytes.length & 0xff;
-            header.set(nameBytes, 2);
-            header.set([
-              (content.length >>> 24) & 0xff,
-              (content.length >>> 16) & 0xff,
-              (content.length >>> 8) & 0xff,
-              content.length & 0xff
-            ], 2 + nameBytes.length);
-            resolve([header, content]);
-          };
-          reader.readAsArrayBuffer(file);
-        });
-      });
+    mergeBtn.onclick = async () => {
+      const files = fileInput.files;
+      if (!files.length) {
+        alert("请先选择文件");
+        return;
+      }
 
-      Promise.all(readFiles).then(results => {
-        results.forEach(([h, c]) => parts.push(h, c));
-        const total = parts.reduce((sum, arr) => sum + arr.length, 0);
-        const width = Math.ceil(Math.sqrt(total));
-        const height = Math.ceil(total / width);
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        const imageData = ctx.createImageData(width, height);
-        const data = imageData.data;
-
-        const flat = new Uint8Array(width * height);
-        let offset = 0;
-        for (let part of parts) {
-          flat.set(part, offset);
-          offset += part.length;
+      try {
+        /* 1. 生成 ZIP */
+        const zip = new JSZip();
+        for (const file of files) {
+          zip.file(file.name, file);
         }
+        const zipBuffer = await zip.generateAsync({ type: "arraybuffer" });
 
-        for (let i = 0; i < flat.length; i++) {
-          data[i * 4] = flat[i]; // R
-          data[i * 4 + 1] = 0;   // G
-          data[i * 4 + 2] = 0;   // B
-          data[i * 4 + 3] = 255; // A
-        }
+        /* 2. 获取 JPG 二进制 */
+        const jpgResp = await fetch(BASE_JPG_URL);
+        if (!jpgResp.ok) throw new Error("JPG 加载失败");
+        const jpgBuffer = await jpgResp.arrayBuffer();
 
-        ctx.putImageData(imageData, 0, 0);
-        canvas.toBlob(blob => {
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = "embedded.jpg";
-          a.textContent = "点击下载 embedded.jpg";
-          a.style.display = 'block';
-          document.getElementById('preview').innerHTML = '';
-          document.getElementById('preview').appendChild(a);
-        }, 'image/png');
-      });
-    }
+        /* 3. 拼接二进制 */
+        const merged = new Uint8Array(
+          jpgBuffer.byteLength + zipBuffer.byteLength
+        );
+        merged.set(new Uint8Array(jpgBuffer), 0);
+        merged.set(new Uint8Array(zipBuffer), jpgBuffer.byteLength);
+
+        /* 4. 生成 Blob */
+        const blob = new Blob([merged], { type: "image/jpeg" });
+        const url = URL.createObjectURL(blob);
+
+        /* 5. 自动下载 */
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "merged.jpg";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+      } catch (e) {
+        console.error(e);
+        alert("合成失败：" + e.message);
+      }
+    };
   </script>
+
 </body>
 </html>
